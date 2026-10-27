@@ -1,0 +1,9 @@
+{
+  "name": "bracket-brawl-api-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Proxy seguro y adaptador de datos para la API oficial de Brawl Stars.",
+  "scripts": { "start": "node server.js", "test": "node --test brawl-stars.test.js" },
+  "engines": { "node": ">=18.0.0" }
+}
+
