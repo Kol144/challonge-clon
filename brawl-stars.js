@@ -66,6 +66,17 @@
     });
   }
 
+  async function loadPlayer(tag, options) {
+    const normalizedTag = cleanTag(tag);
+    const baseUrl = (options?.baseUrl || '').replace(/\/$/, '');
+    if (!baseUrl) throw new Error('Configura la URL del servidor Brawl Stars antes de consultar.');
+    const response = await (options?.fetch || fetch)(`${baseUrl}/api/brawl-stars/players/${encodeURIComponent(normalizedTag)}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { const error = new Error(body.message || 'No se encontró el jugador.'); error.status=response.status; error.code=body.code||'API_ERROR'; throw error; }
+    if (typeof body?.name !== 'string' || !body.name.trim()) throw new Error('La API no devolvió el nombre del jugador.');
+    return { tag: body.tag || `#${normalizedTag}`, name: body.name.trim() };
+  }
+
   async function loadPlayerBattleLog(tag, options) {
     const normalizedTag = cleanTag(tag);
     const baseUrl = (options?.baseUrl || '').replace(/\/$/, '');
@@ -86,5 +97,5 @@
     return battles;
   }
 
-  return { cleanTag, normalizeBattleLog, loadPlayerBattleLog };
+  return { cleanTag, normalizeBattleLog, loadPlayer, loadPlayerBattleLog };
 });
