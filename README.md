@@ -20,3 +20,9 @@ El proxy mantiene una caché en memoria de 30 segundos por tag y traduce errores
 ## Verificación
 
 Ejecuta `npm test` para comprobar validación de tags, estructuras de batalla, datos incompletos y detección del jugador estelar. Las pruebas usan fixtures estructurales; no sustituyen una consulta real. Para confirmar datos reales hace falta una clave privada válida y un tag de jugador.
+
+## Bracket y detalles de partido
+
+El bracket mezcla al azar a los equipos al preparar la primera ronda. Si el total no es potencia de dos, algunos pasan directamente para completar el cuadro. Cada resultado habilita la ronda siguiente; al completar las semifinales se crean la final y el partido por el bronce. Al pulsar un cruce se abre su ficha con los equipos, los jugadores, brawlers, modo, mapa y jugador estelar encontrados en el historial.
+
+La API oficial ofrece el historial de batalla de cada tag, no las selecciones en directo de una partida futura. Por eso, los brawlers, el modo y el estelar aparecen cuando Brawl Stars ya ha registrado una batalla en la que coinciden participantes de ambos equipos. La ficha indica cuando aún no existe esa coincidencia.

@@ -42,8 +42,8 @@ function statusError(status) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, corsHeaders(req)); return res.end(); }
-  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html' || req.url === '/brawl-stars.js')) {
-    const file = req.url === '/brawl-stars.js' ? 'brawl-stars.js' : 'index.html';
+  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html' || req.url === '/brawl-stars.js' || req.url === '/tournament-bracket.js')) {
+    const file = req.url === '/brawl-stars.js' ? 'brawl-stars.js' : req.url === '/tournament-bracket.js' ? 'tournament-bracket.js' : 'index.html';
     const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8';
     res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-cache' });
     return fs.createReadStream(path.join(__dirname, file)).pipe(res);

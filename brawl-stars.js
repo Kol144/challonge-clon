@@ -36,7 +36,8 @@
       const starTag = typeof star?.tag === 'string' ? star.tag.replace(/^#/, '').toUpperCase() : null;
       const teams = Array.isArray(battle.teams) ? battle.teams : [];
       const groups = teams.length ? teams.filter(Array.isArray) : (Array.isArray(battle.players) ? [battle.players] : []);
-      const participants = groups.flat().filter(p => p && typeof p === 'object').map(p => normalizePlayer(p, starTag, star?.name ?? null));
+      const normalizedTeams = groups.map(group => group.filter(p => p && typeof p === 'object').map(p => normalizePlayer(p, starTag, star?.name ?? null)));
+      const participants = normalizedTeams.flat();
       // Prefer the official tag. If it is absent, use an exact name only when it
       // identifies one participant uniquely; never guess between duplicate names.
       if (star && !starTag && typeof star.name === 'string') {
@@ -54,13 +55,15 @@
         mode: typeof battle.mode === 'string' ? battle.mode : (typeof event.mode === 'string' ? event.mode : null),
         map: typeof event.map === 'string' ? event.map : null,
         starPlayer,
+        teams: teams.length ? normalizedTeams : [],
         participants,
         dataAvailable: {
           battleTime: typeof entry?.battleTime === 'string',
           result: typeof battle.result === 'string',
           mode: typeof battle.mode === 'string' || typeof event.mode === 'string',
           map: typeof event.map === 'string',
-          starPlayer: !!star
+          starPlayer: !!star,
+          teams: teams.length > 0
         }
       };
     });
