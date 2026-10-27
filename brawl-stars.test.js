@@ -36,3 +36,10 @@ test('maneja historial alternativo, campos incompletos y ausencia del estelar', 
   assert.equal(result[0].dataAvailable.battleTime, false);
 });
 
+test('usa el nombre del estelar solo cuando identifica a un único participante', () => {
+  const unique = normalizeBattleLog({items:[{battle:{starPlayer:{name:'Único'},teams:[[{name:'Único',tag:'#2R20PL0UR'}]]}}]});
+  assert.equal(unique[0].participants[0].isStarPlayer,true);
+  const ambiguous = normalizeBattleLog({items:[{battle:{starPlayer:{name:'Duplicado'},teams:[[{name:'Duplicado',tag:'#2R20PL0UR'},{name:'Duplicado',tag:'#8U2Q9Y0'}]]}}]});
+  assert.equal(ambiguous[0].participants.every(player=>!player.isStarPlayer),true);
+});
+

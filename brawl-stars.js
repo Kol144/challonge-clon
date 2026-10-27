@@ -37,6 +37,12 @@
       const teams = Array.isArray(battle.teams) ? battle.teams : [];
       const groups = teams.length ? teams.filter(Array.isArray) : (Array.isArray(battle.players) ? [battle.players] : []);
       const participants = groups.flat().filter(p => p && typeof p === 'object').map(p => normalizePlayer(p, starTag, star?.name ?? null));
+      // Prefer the official tag. If it is absent, use an exact name only when it
+      // identifies one participant uniquely; never guess between duplicate names.
+      if (star && !starTag && typeof star.name === 'string') {
+        const matchingParticipants = participants.filter(p => p.name === star.name);
+        if (matchingParticipants.length === 1) matchingParticipants[0].isStarPlayer = true;
+      }
       const starPlayer = star ? {
         name: typeof star.name === 'string' ? star.name : null,
         tag: typeof star.tag === 'string' ? star.tag : null,
