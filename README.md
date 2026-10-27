@@ -7,11 +7,11 @@ La clave oficial permanece únicamente en el proceso del servidor. La página es
 1. Crea una clave en el portal oficial de desarrolladores: https://developer.brawlstars.com/ . No la pongas en `index.html`, en el repositorio ni en el navegador.
 2. Configura `BRAWL_STARS_API_TOKEN` en el entorno del servidor. `.env.example` solo muestra los nombres de configuración; Node no lee archivos `.env` automáticamente.
 3. Ejecuta `npm start` con Node 18 o posterior. La ruta del proxy es `GET /api/brawl-stars/players/{tag}/battlelog`.
-4. Desde la página, el adaptador se expone como `window.BrawlStarsData`. Ejemplo: `window.BrawlStarsData.loadPlayerBattleLog('#TAG', { baseUrl: 'https://tu-servidor.example' })`.
+4. Entra al torneo y abre el menú **Brawl Stars API**. Guarda la URL pública del servidor. Añade tags en el formulario de cada jugador; son opcionales si no quieres seguir a esa cuenta. Desde **Vista de bracket**, pulsa **Iniciar torneo y seguimiento**. El navegador consulta los historiales registrados al iniciar y cada 60 segundos, y guarda las partidas nuevas en **Partidas recientes**.
 
 `loadPlayerBattleLog` devuelve partidas normalizadas y publica el evento `brawlstars:battlelog` con `{ playerTag, battles }`. También acepta `onData(battles)` como punto de entrega a código consumidor. Cada batalla conserva los datos ausentes como `null`, expone `dataAvailable` y marca `isStarPlayer` solo si la API entrega un tag estelar que coincide con el tag del participante. Admite participantes bajo `battle.teams` o `battle.players`.
 
-El sistema de torneo actual guarda nombres de jugadores como texto, no tags, y no tiene aún una función que consuma datos de Brawl Stars. Por eso no se asocian jugadores automáticamente por nombres potencialmente ambiguos ni se cambia su presentación. El adaptador entrega la estructura lista para que esa asociación se haga cuando exista una interfaz con tags.
+Los tags se guardan con cada equipo y la consulta se asocia por tag oficial, no por nombre. El seguimiento recupera el historial de batalla de cada tag y deduplica las partidas por cuenta y hora. GitHub Pages por sí solo no ejecuta el servidor; hace falta alojar `server.js` en un servicio Node y configurar en ese servicio `BRAWL_STARS_API_TOKEN` y `ALLOWED_ORIGIN` con el dominio de GitHub Pages. Mantén el token como secreto del entorno, nunca en la web.
 
 El proxy mantiene una caché en memoria de 30 segundos por tag y traduce errores de autenticación, tags inválidos, jugador no encontrado, límite de peticiones y fallos de conexión. El alojamiento estático de GitHub Pages no sirve `server.js`; para producción, aloja el proxy por separado y pasa su URL como `baseUrl`.
 
