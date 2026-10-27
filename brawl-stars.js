@@ -70,7 +70,7 @@
     const normalizedTag = cleanTag(tag);
     const baseUrl = (options?.baseUrl || '').replace(/\/$/, '');
     if (!baseUrl) throw new Error('Configura la URL del servidor Brawl Stars antes de consultar.');
-    const response = await (options?.fetch || fetch)(`${baseUrl}/api/brawl-stars/players/${encodeURIComponent(normalizedTag)}`, { headers: options?.token ? { Authorization: `Bearer ${options.token}` } : {} });
+    const response = await (options?.fetch || fetch)(`${baseUrl}/api/brawl-stars/players/${encodeURIComponent(normalizedTag)}`, { headers: options?.token ? { Authorization: `Bearer ${options.token}` } : {}, signal: AbortSignal.timeout(12_000) });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) { const error = new Error(body.message || 'No se encontró el jugador.'); error.status=response.status; error.code=body.code||'API_ERROR'; throw error; }
     if (typeof body?.name !== 'string' || !body.name.trim()) throw new Error('La API no devolvió el nombre del jugador.');
@@ -81,7 +81,7 @@
     const normalizedTag = cleanTag(tag);
     const baseUrl = (options?.baseUrl || '').replace(/\/$/, '');
     if (!baseUrl) throw new Error('Configura la URL del servidor Brawl Stars antes de consultar.');
-    const response = await (options?.fetch || fetch)(`${baseUrl}/api/brawl-stars/players/${encodeURIComponent(normalizedTag)}/battlelog`, { headers: options?.token ? { Authorization: `Bearer ${options.token}` } : {} });
+    const response = await (options?.fetch || fetch)(`${baseUrl}/api/brawl-stars/players/${encodeURIComponent(normalizedTag)}/battlelog`, { headers: options?.token ? { Authorization: `Bearer ${options.token}` } : {}, signal: AbortSignal.timeout(12_000) });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(body.message || 'No se pudo obtener el historial de Brawl Stars.');
