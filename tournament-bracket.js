@@ -54,7 +54,7 @@
   }
 
   function createNextRound(winnerIds) {
-    const ids = winnerIds.filter(Boolean);
+    const ids = shuffled(winnerIds.filter(Boolean));
     return {
       name: roundName(ids.length),
       teamCount: ids.length,
@@ -77,13 +77,42 @@
   function updateRecords(tournament) {
     tournament.teams.forEach(team => { team.wins = 0; team.losses = 0; team.points = 0; });
     (tournament.rounds || []).forEach(round => round.matches.forEach(match => {
-      if (!match.winnerId || !match.teamIds[1] || !match.scores.every(validScore)) return;
+      if (!match.winnerId || !match.teamIds[1]) return;
       const loserId = match.teamIds.find(id => id !== match.winnerId);
       const winner = tournament.teams.find(team => team.id === match.winnerId);
       const loser = tournament.teams.find(team => team.id === loserId);
       if (winner) { winner.wins += 1; winner.points += 3; }
       if (loser) loser.losses += 1;
     }));
+  }
+
+  function setWinner(tournament, roundIndex, matchIndex, winnerId) {
+    const round = tournament.rounds?.[roundIndex];
+    const match = round?.matches?.[matchIndex];
+    if (!match || match.bye || !match.teamIds.includes(winnerId)) return false;
+    if (tournament.rounds.slice(roundIndex + 1).some(item => !item.isBronze)) return false;
+    match.winnerId = winnerId;
+    match.scores = [null, null];
+    updateRecords(tournament);
+    return true;
+  }
+
+  function advanceRound(tournament, roundIndex) {
+    const rounds = tournament.rounds || [];
+    const round = rounds[roundIndex];
+    if (!round || round.isBronze || round.isFinal) return null;
+    if (rounds.slice(roundIndex + 1).some(item => !item.isBronze)) return null;
+    if (!round.matches.length || !round.matches.every(match => match.winnerId)) return null;
+    const next = createNextRound(round.matches.map(match => match.winnerId));
+    if (!next.matches.length) return null;
+    rounds.push(next);
+    if (round.name === 'SEMIFINALES' && round.matches.length === 2 && round.matches.every(match => match.teamIds[1])) {
+      const losers = round.matches.map(match => match.teamIds.find(id => id !== match.winnerId));
+      const bronze = createBronzeRound(losers);
+      if (bronze) rounds.push(bronze);
+    }
+    updateRecords(tournament);
+    return next;
   }
 
   function findApiBattle(tournament, match, teamById, cleanTag) {
@@ -154,9 +183,16 @@
       : '<div class="match-api-empty"><strong>' + escape(emptyTitle) + '</strong><p>' + escape(emptyMessage) + '</p></div>';
     const players = groups.map((group, groupIndex) => '<section class="match-player-team"><h3>' + escape(groupNames[groupIndex] || (groupIndex === 0 ? one.name : two.name)) + '</h3>' +
       (group.length ? group.map(player => '<div class="match-player"><span>' + escape(withoutAccents(player.name || 'Jugador')) + (player.isStarPlayer ? '<b class="star-player-badge" title="Jugador estelar">★ ESTELAR</b>' : '') + '</span><small>' + escape(player.tag || '') + '</small><strong>' + escape(withoutAccents(player.brawler || 'Brawler sin datos')) + '</strong></div>').join('') : '<p class="match-no-players">Sin jugadores registrados en la API.</p>') + '</section>').join('');
-    root.innerHTML = '<div class="match-detail-versus"><span>' + escape(one.name) + '</span><b>VS</b><span>' + escape(two.name) + '</span></div>' + meta +
+    const locked = tournament.rounds.slice(roundIndex + 1).some(item => !item.isBronze);
+    const winnerChoice = '<section class="winner-choice"><div class="winner-choice-heading">ELIGE AL GANADOR · RESULTADO PROVISIONAL</div><div class="winner-choice-buttons">' +
+      [one, two].map(team => '<button type="button" class="winner-choice-button' + (match.winnerId === team.id ? ' selected' : '') + '" data-winner-id="' + escape(team.id) + '" ' + (locked ? 'disabled' : '') + '>' + escape(team.name) + (match.winnerId === team.id ? ' ✓' : '') + '</button>').join('') +
+      '</div>' + (locked ? '<small>El ganador quedó fijado al pasar de ronda.</small>' : '') + '</section>';
+    root.innerHTML = '<div class="match-detail-versus"><span>' + escape(one.name) + '</span><b>VS</b><span>' + escape(two.name) + '</span></div>' + winnerChoice + meta +
       '<div class="match-api-source">' + (battle ? 'Datos encontrados en el historial de Brawl Stars' : 'Selecciones y jugador estelar pendientes de los datos de la partida') + '</div>' +
       '<div class="match-player-grid">' + players + '</div>';
+    root.querySelectorAll('[data-winner-id]:not([disabled])').forEach(button => {
+      button.onclick = () => options.onWinnerSelected?.(button.dataset.winnerId);
+    });
   }
 
   function render(tournament, area, options) {
@@ -165,8 +201,7 @@
       area.innerHTML = '<div class="empty-state"><strong>Tu bracket empieza con los equipos</strong>Añade participantes desde el menú Equipos.</div>';
       return;
     }
-
-    const played = round => round.matches.some(match => match.scores?.some(score => score !== null && score !== undefined));
+    const played = round => round.matches.some(match => match.winnerId || match.scores?.some(score => score !== null && score !== undefined));
     if (!tournament.rounds?.length || (tournament.rounds.length === 1 && !tournament.rounds[0].seeded && !played(tournament.rounds[0]))) {
       const opening = createInitialRound(tournament.teams.map(team => team.id));
       tournament.rounds = opening ? [opening] : [];
@@ -187,31 +222,39 @@
         if (match.bye && !match.winnerId) match.winnerId = match.teamIds[0];
       });
     });
-
     const teamById = id => tournament.teams.find(team => team.id === id);
     const championRound = rounds.find(round => round.isFinal && round.matches[0]?.winnerId);
     const champion = championRound ? teamById(championRound.matches[0].winnerId) : null;
+    const lastPlayableIndex = rounds.reduce((last, round, index) => round.isBronze ? last : index, -1);
     const columns = rounds.map((round, roundIndex) => {
       const cards = round.matches.map((match, matchIndex) => {
         const one = teamById(match.teamIds[0]);
         const two = teamById(match.teamIds[1]);
         const label = match.isBronze ? 'PARTIDO POR EL BRONCE' : round.name;
-        const title = one && two ? `${one.name} vs ${two.name}` : (one?.name || 'Partido');
+        const title = one && two ? one.name + ' vs ' + two.name : (one?.name || 'Partido');
+        const loserId = match.winnerId && two ? match.teamIds.find(id => id !== match.winnerId) : null;
         const cardClass = 'match' + (round.isFinal ? ' final-card' : '') + (match.isBronze ? ' bronze-card' : '') + (!two ? ' bye-match' : '');
-        const scoreInput = (team, side) => '<input class="score" type="number" min="0" aria-label="Puntuación ' + escape(team?.name || 'equipo') + '" data-match-round="' + roundIndex + '" data-match-index="' + matchIndex + '" data-side="' + side + '" value="' + (match.scores[side] ?? '') + '" ' + (match.winnerId || match.bye ? 'disabled' : '') + '>';
+        const teamRow = team => '<div class="team-row' + (match.winnerId === team?.id ? ' winner' : '') + (loserId === team?.id ? ' eliminated' : '') + '"><span>' + (team ? escape(team.name) : 'Por decidir') + '</span>' + (match.winnerId === team?.id ? '<small class="winner-label">GANADOR</small>' : '') + '</div>';
         return '<article class="' + cardClass + '" ' + (two ? 'role="button" tabindex="0" data-round-index="' + roundIndex + '" data-match-index="' + matchIndex + '" aria-label="Ver detalles: ' + escape(title) + '"' : 'aria-disabled="true"') + '>' +
-          '<div class="match-kicker">' + escape(label) + '</div>' +
-          '<div class="team-row ' + (match.winnerId === one?.id ? 'winner' : '') + '"><span>' + (one ? escape(one.name) : 'Por decidir') + '</span>' + scoreInput(one, 0) + '</div>' +
-          '<div class="team-row ' + (two && match.winnerId === two.id ? 'winner' : '') + '"><span>' + (two ? escape(two.name) : 'Pasa directamente') + '</span>' + (two ? scoreInput(two, 1) : '<span class="bye-label">BYE</span>') + '</div>' +
-          (two ? '<div class="match-hint">Pulsa para ver el partido</div>' : '') + '</article>';
+          '<div class="match-kicker">' + escape(label) + '</div>' + teamRow(one) + (two ? teamRow(two) : '<div class="team-row bye-label">PASA DIRECTAMENTE</div>') +
+          (two ? '<div class="match-hint">Pulsa para elegir el ganador provisional</div>' : '') + '</article>';
       }).join('');
-      return '<section class="round"><h3>' + escape(round.name) + '</h3>' + cards + '</section>';
+      const canAdvance = roundIndex === lastPlayableIndex && !round.isBronze && !round.isFinal && round.matches.length && round.matches.every(match => match.winnerId);
+      const advanceButton = canAdvance ? '<button type="button" class="advance-round" data-advance-round="' + roundIndex + '">MEZCLAR EQUIPOS Y PASAR A ' + escape(roundName(round.matches.length)) + '</button>' : '';
+      return '<section class="round"><h3>' + escape(round.name) + '</h3>' + cards + advanceButton + '</section>';
     }).join('');
-
-    area.innerHTML = '<div class="bracket-grid" style="grid-template-columns:repeat(' + rounds.length + ',minmax(230px,1fr))">' + columns + '</div>' +
+    area.innerHTML = '<div class="bracket-grid" style="grid-template-columns:repeat(' + rounds.length + ',minmax(250px,1fr))">' + columns + '</div>' +
       (champion ? '<div class="champion"><span class="eyebrow">CAMPEÓN</span><strong>' + escape(champion.name) + '</strong></div>' : '');
-
     area.onclick = event => {
+      const advanceButton = event.target.closest('[data-advance-round]');
+      if (advanceButton) {
+        const next = advanceRound(tournament, Number(advanceButton.dataset.advanceRound));
+        if (!next) return;
+        options.save();
+        options.toast('Equipos mezclados · comienza ' + next.name.toLowerCase());
+        options.onUpdate();
+        return;
+      }
       if (event.target.closest('.score')) return;
       const card = event.target.closest('[data-round-index]');
       if (card) options.openMatch(Number(card.dataset.roundIndex), Number(card.dataset.matchIndex));
@@ -224,45 +267,7 @@
       event.preventDefault();
       options.openMatch(Number(card.dataset.roundIndex), Number(card.dataset.matchIndex));
     };
-
-    area.querySelectorAll('.score:not([disabled])').forEach(input => {
-      input.onchange = () => {
-        const roundIndex = Number(input.dataset.matchRound);
-        const matchIndex = Number(input.dataset.matchIndex);
-        const side = Number(input.dataset.side);
-        const round = rounds[roundIndex];
-        const match = round.matches[matchIndex];
-        match.scores[side] = input.value === '' ? null : Number(input.value);
-        match.winnerId = null;
-        if (match.scores.every(validScore)) {
-          if (match.scores[0] === match.scores[1]) {
-            match.scores = [null, null];
-            options.toast('El empate no decide la partida');
-          } else {
-            match.winnerId = match.teamIds[match.scores[0] > match.scores[1] ? 0 : 1];
-          }
-        }
-        if (round.matches.every(item => item.winnerId) && !round.isBronze && roundIndex === rounds.length - 1) {
-          const winners = round.matches.map(item => item.winnerId);
-          if (round.isFinal) {
-            options.toast('¡' + (teamById(winners[0])?.name || 'Campeón') + ' es campeón!');
-          } else {
-            const next = createNextRound(winners);
-            tournament.rounds.push(next);
-            if (round.name === 'SEMIFINALES' && round.matches.length === 2 && round.matches.every(item => item.teamIds[1])) {
-              const losers = round.matches.map(item => item.teamIds.find(id => id !== item.winnerId));
-              const bronze = createBronzeRound(losers);
-              if (bronze) tournament.rounds.push(bronze);
-            }
-            options.toast('Fase completada · ' + next.name.toLowerCase());
-          }
-        }
-        updateRecords(tournament);
-        options.save();
-        options.onUpdate();
-      };
-    });
   }
 
-  return { shuffled, nextPowerOfTwo, roundName, createInitialRound, createNextRound, createBronzeRound, render, renderMatchDetails };
+  return { shuffled, nextPowerOfTwo, roundName, createInitialRound, createNextRound, createBronzeRound, setWinner, advanceRound, render, renderMatchDetails };
 });
