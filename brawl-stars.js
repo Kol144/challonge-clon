@@ -21,6 +21,9 @@
       name: typeof player?.name === 'string' ? player.name : null,
       tag,
       brawler: typeof player?.brawler?.name === 'string' ? player.brawler.name : null,
+      brawlerId: Number.isFinite(player?.brawler?.id) ? player.brawler.id : null,
+      brawlerPower: Number.isFinite(player?.brawler?.power) ? player.brawler.power : null,
+      brawlerTrophies: Number.isFinite(player?.brawler?.trophies) ? player.brawler.trophies : null,
       isStarPlayer,
       dataAvailable: { name: typeof player?.name === 'string', tag: !!tag, brawler: typeof player?.brawler?.name === 'string' }
     };
@@ -52,10 +55,15 @@
       return {
         battleTime: typeof entry?.battleTime === 'string' ? entry.battleTime : null,
         result: typeof battle.result === 'string' ? battle.result : null,
+        type: typeof battle.type === 'string' ? battle.type : null,
+        trophyChange: Number.isFinite(battle.trophyChange) ? battle.trophyChange : null,
+        duration: Number.isFinite(battle.duration) ? battle.duration : null,
+        rank: Number.isFinite(battle.rank) ? battle.rank : null,
         mode: typeof battle.mode === 'string' ? battle.mode : (typeof event.mode === 'string' ? event.mode : null),
+        modeId: Number.isFinite(Number(event.modeId)) && Number(event.modeId) > 0 ? Number(event.modeId) : null,
         map: typeof event.map === 'string' ? event.map : null,
         starPlayer,
-        teams: teams.length ? normalizedTeams : [],
+      teams: teams.length ? normalizedTeams : [],
         participants,
         dataAvailable: {
           battleTime: typeof entry?.battleTime === 'string',
@@ -77,7 +85,7 @@
     const body = await response.json().catch(() => ({}));
     if (!response.ok) { const error = new Error(body.message || 'No se encontró el jugador.'); error.status=response.status; error.code=body.code||'API_ERROR'; throw error; }
     if (typeof body?.name !== 'string' || !body.name.trim()) throw new Error('La API no devolvió el nombre del jugador.');
-    return { tag: body.tag || `#${normalizedTag}`, name: body.name.trim() };
+    return { ...body, tag: body.tag || `#${normalizedTag}`, name: body.name.trim() };
   }
 
   async function loadPlayerBattleLog(tag, options) {
