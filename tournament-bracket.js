@@ -97,6 +97,17 @@
     return true;
   }
 
+  function clearWinner(tournament, roundIndex, matchIndex) {
+    const round = tournament.rounds?.[roundIndex];
+    const match = round?.matches?.[matchIndex];
+    if (!match || match.bye || !match.winnerId) return false;
+    if (tournament.rounds.slice(roundIndex + 1).some(item => !item.isBronze)) return false;
+    match.winnerId = null;
+    match.scores = [null, null];
+    updateRecords(tournament);
+    return true;
+  }
+
   function advanceRound(tournament, roundIndex) {
     const rounds = tournament.rounds || [];
     const round = rounds[roundIndex];
@@ -186,13 +197,14 @@
     const locked = tournament.rounds.slice(roundIndex + 1).some(item => !item.isBronze);
     const winnerChoice = '<section class="winner-choice"><div class="winner-choice-heading">ELIGE AL GANADOR · RESULTADO PROVISIONAL</div><div class="winner-choice-buttons">' +
       [one, two].map(team => '<button type="button" class="winner-choice-button' + (match.winnerId === team.id ? ' selected' : '') + '" data-winner-id="' + escape(team.id) + '" ' + (locked ? 'disabled' : '') + '>' + escape(team.name) + (match.winnerId === team.id ? ' ✓' : '') + '</button>').join('') +
-      '</div>' + (locked ? '<small>El ganador quedó fijado al pasar de ronda.</small>' : '') + '</section>';
+      '</div><button type="button" class="winner-choice-reset" data-clear-winner ' + (!match.winnerId || locked ? 'disabled' : '') + '>TODAVÍA POR DECIDIR</button>' + (locked ? '<small>El ganador quedó fijado al pasar de ronda.</small>' : '') + '</section>';
     root.innerHTML = '<div class="match-detail-versus"><span>' + escape(one.name) + '</span><b>VS</b><span>' + escape(two.name) + '</span></div>' + winnerChoice + meta +
       '<div class="match-api-source">' + (battle ? 'Datos encontrados en el historial de Brawl Stars' : 'Selecciones y jugador estelar pendientes de los datos de la partida') + '</div>' +
       '<div class="match-player-grid">' + players + '</div>';
     root.querySelectorAll('[data-winner-id]:not([disabled])').forEach(button => {
       button.onclick = () => options.onWinnerSelected?.(button.dataset.winnerId);
     });
+    root.querySelector('[data-clear-winner]:not([disabled])')?.addEventListener('click', () => options.onWinnerCleared?.());
   }
 
   function render(tournament, area, options) {
@@ -234,7 +246,11 @@
         const title = one && two ? one.name + ' vs ' + two.name : (one?.name || 'Partido');
         const loserId = match.winnerId && two ? match.teamIds.find(id => id !== match.winnerId) : null;
         const cardClass = 'match' + (round.isFinal ? ' final-card' : '') + (match.isBronze ? ' bronze-card' : '') + (!two ? ' bye-match' : '');
-        const teamRow = team => '<div class="team-row' + (match.winnerId === team?.id ? ' winner' : '') + (loserId === team?.id ? ' eliminated' : '') + '"><span>' + (team ? escape(team.name) : 'Por decidir') + '</span>' + (match.winnerId === team?.id ? '<small class="winner-label">GANADOR</small>' : '') + '</div>';
+        const teamRow = team => {
+          const isWinner = match.winnerId === team?.id;
+          const crown = isWinner ? '<img class="winner-crown" src="/assets/corona-estelar.png" alt="" aria-hidden="true">' : '';
+          return '<div class="team-row' + (isWinner ? ' winner' : '') + (loserId === team?.id ? ' eliminated' : '') + '"><span class="team-name">' + (team ? escape(team.name) : 'Por decidir') + crown + '</span>' + (isWinner ? '<small class="winner-label">GANADOR</small>' : '') + '</div>';
+        };
         return '<article class="' + cardClass + '" ' + (two ? 'role="button" tabindex="0" data-round-index="' + roundIndex + '" data-match-index="' + matchIndex + '" aria-label="Ver detalles: ' + escape(title) + '"' : 'aria-disabled="true"') + '>' +
           '<div class="match-kicker">' + escape(label) + '</div>' + teamRow(one) + (two ? teamRow(two) : '<div class="team-row bye-label">PASA DIRECTAMENTE</div>') +
           (two ? '<div class="match-hint">Pulsa para elegir el ganador provisional</div>' : '') + '</article>';
@@ -269,5 +285,5 @@
     };
   }
 
-  return { shuffled, nextPowerOfTwo, roundName, createInitialRound, createNextRound, createBronzeRound, setWinner, advanceRound, render, renderMatchDetails };
+  return { shuffled, nextPowerOfTwo, roundName, createInitialRound, createNextRound, createBronzeRound, setWinner, clearWinner, advanceRound, render, renderMatchDetails };
 });

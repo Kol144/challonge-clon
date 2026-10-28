@@ -42,6 +42,7 @@ function statusError(status) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, corsHeaders(req)); return res.end(); }
+  if (req.method === 'GET' && req.url === '/healthz') return send(req, res, 200, { ok: true });
   if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html' || req.url === '/brawl-stars.js' || req.url === '/tournament-bracket.js')) {
     const file = req.url === '/brawl-stars.js' ? 'brawl-stars.js' : req.url === '/tournament-bracket.js' ? 'tournament-bracket.js' : 'index.html';
     const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8';
@@ -93,4 +94,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`Brawl Stars API proxy escuchando en el puerto ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Brawl Stars API proxy escuchando en el puerto ${PORT}`));
